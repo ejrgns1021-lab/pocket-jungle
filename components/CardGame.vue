@@ -1,5 +1,5 @@
 <template>
-  <div class="cg">
+  <div class="cg" :style="frameStyle">
     <canvas ref="canvasEl" class="stage" @pointerdown="onStageTap" />
 
     <!-- 상단 바 -->
@@ -213,6 +213,26 @@ const lb = useLeaderboard('cards')
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 let scene: any = null
 
+// ── PC 화면 맞춤: 큰 모니터에서는 게임 전체를 확대(가상 해상도) ──
+const view = reactive({ w: 390, h: 800, z: 1 })
+function measure() {
+  const W = window.innerWidth
+  const H = window.innerHeight
+  const touch = matchMedia('(pointer: coarse)').matches
+  const z = touch || W < 760 ? 1 : Math.max(1, Math.min(H / 640, W / 1100, 2.4))
+  view.z = z
+  view.w = W / z
+  view.h = H / z
+}
+if (typeof window !== 'undefined') measure()
+const frameStyle = computed(() => ({
+  width: view.w + 'px',
+  height: view.h + 'px',
+  transform: view.z !== 1 ? `scale(${view.z})` : undefined,
+  '--vh': view.h + 'px'
+}))
+function onResize() { measure(); scene?.resize() }
+
 const run = reactive<any>(makeRun())
 const b = computed(() => run.battle)
 const busy = ref(false)
@@ -238,11 +258,13 @@ function makeRun() {
 }
 
 onMounted(() => {
-  scene = createScene(canvasEl.value!, () => run, { night: props.night })
+  measure()
+  scene = createScene(canvasEl.value!, () => run, { night: props.night, view: () => view })
+  window.addEventListener('resize', onResize)
   E.setEmitter((ev: any) => scene?.onEvent(ev))
   SoundFX.unlock()
 })
-onBeforeUnmount(() => { E.setEmitter(null); scene?.destroy() })
+onBeforeUnmount(() => { window.removeEventListener('resize', onResize); E.setEmitter(null); scene?.destroy() })
 
 function restart() {
   saved.value = null
@@ -260,7 +282,7 @@ const fusions = computed(() => (b.value ? E.availableFusions(run) : []))
 const playable = (i: number) => E.canPlay(run, i)
 
 function slotStyle(i: number, n: number) {
-  const W = typeof window !== 'undefined' ? window.innerWidth : 390
+  const W = view.w
   const cardW = W >= 760 ? 118 : 92
   const avail = Math.min(W - 24, 900)
   const step = n <= 1 ? 0 : Math.min(cardW * 0.92, (avail - cardW) / (n - 1))
@@ -291,7 +313,7 @@ function doFuse(id: string) { E.fuse(run, id) }
 
 function onStageTap(ev: PointerEvent) {
   if (!scene || run.screen !== 'battle') return
-  const uid = scene.pick(ev.clientX, ev.clientY)
+  const uid = scene.pick(ev.clientX / view.z, ev.clientY / view.z)
   if (uid) { E.setTarget(run, uid); vibrate(8) }
 }
 
@@ -352,8 +374,8 @@ function toast(t: string) { toastMsg.value = t; toastKey.value++; setTimeout(() 
 </script>
 
 <style scoped>
-.cg { position: fixed; inset: 0; }
-.stage { position: fixed; inset: 0; width: 100vw; height: 100dvh; display: block; touch-action: manipulation; }
+.cg { position: fixed; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
+.stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
 .topbar { position: fixed; top: calc(6px + var(--sat)); left: 6px; right: 6px; z-index: 40; display: flex; gap: 6px; align-items: center; }
 .hpbox { flex: 1; display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; min-width: 0; }
 .hpbar { flex: 1; height: 12px; background: #202830; border-radius: 3px; padding: 2px; overflow: hidden; }
@@ -402,7 +424,7 @@ function toast(t: string) { toastMsg.value = t; toastKey.value++; setTimeout(() 
 .endturn:active { transform: translateY(3px); }
 .hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(210px + var(--sab)); z-index: 45; background: rgba(0, 0, 0, 0.75); color: #fff; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 13px; }
 .overlay { z-index: 60; }
-.panel { width: 100%; max-width: 440px; padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100dvh - 24px); overflow-y: auto; text-align: center; }
+.panel { width: 100%; max-width: 440px; padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: calc(var(--vh, 100dvh) - 24px); overflow-y: auto; text-align: center; }
 .panel.wide { max-width: 620px; }
 .panel h2 { font-size: 19px; }
 .panel h2 small { font-size: 13px; color: #a87808; }
@@ -418,7 +440,7 @@ function toast(t: string) { toastMsg.value = t; toastKey.value++; setTimeout(() 
 .pick.sold { opacity: 0.35; pointer-events: none; }
 .pick.poor .price { color: #c83828; }
 .price { font: 900 13px 'Courier New', monospace; }
-.deck-grid { max-height: 55dvh; }
+.deck-grid { max-height: calc(var(--vh, 100dvh) * 0.55); }
 .relic-pick { display: flex; flex-direction: column; gap: 6px; }
 .relic-card { display: flex; align-items: center; gap: 10px; text-align: left; border: 3px solid #202830; border-radius: 10px; padding: 8px 10px; background: linear-gradient(180deg, #f8f0ff, #e8d8f8); box-shadow: inset 0 0 0 2px #7838b8; font-size: 13px; }
 .relic-card:disabled { opacity: 0.5; }
@@ -442,5 +464,10 @@ function toast(t: string) { toastMsg.value = t; toastKey.value++; setTimeout(() 
   .hand { height: 190px; }
   .chain { bottom: 270px; }
   .fusions { bottom: 234px; }
+  /* 넓은 화면: 상단바·에너지·턴종료를 가운데 무대 폭에 모으기 */
+  .topbar, .relics { left: 50%; right: auto; width: min(1000px, calc(100% - 12px)); transform: translateX(-50%); }
+  .energy { left: max(10px, calc(50% - 540px)); }
+  .piles { left: max(80px, calc(50% - 470px)); }
+  .endturn { right: max(10px, calc(50% - 540px)); }
 }
 </style>

@@ -18,16 +18,17 @@ export function createScene(canvas, getRun, opts = {}) {
   // 무대 영역 (위 상태바 ~ 아래 손패 사이)
   const stage = { top: 0, bottom: 0 }
   function resize() {
-    W = window.innerWidth
-    H = window.innerHeight
-    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const v = opts.view ? opts.view() : null
+    W = v ? v.w : window.innerWidth
+    H = v ? v.h : window.innerHeight
+    dpr = Math.min((window.devicePixelRatio || 1) * (v ? v.z : 1), 3)
     canvas.width = Math.floor(W * dpr)
     canvas.height = Math.floor(H * dpr)
     stage.top = 64
     stage.bottom = Math.max(stage.top + 220, H - (isMobile ? 250 : 270))
     bg = null
   }
-  window.addEventListener('resize', resize)
+  if (!opts.view) window.addEventListener('resize', resize)
   resize()
 
   // ── 연출 상태 ──
@@ -660,6 +661,7 @@ export function createScene(canvas, getRun, opts = {}) {
     },
     setNight(n) { night = n; bg = null },
     get stageBottom() { return stage.bottom },
+    resize,
     destroy() { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }
 }

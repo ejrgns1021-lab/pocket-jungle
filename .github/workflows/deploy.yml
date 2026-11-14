@@ -1,6 +1,7 @@
 # main 브랜치에 push 하면 자동으로
 #  1) GitHub Pages 에 배포 (설정 없이 바로 동작 → https://<아이디>.github.io/pocket-jungle/)
-#  2) Firebase Hosting + Firestore 규칙 배포 (시크릿 FIREBASE_SERVICE_ACCOUNT 를 넣으면 켜짐)
+#  2) Firebase Hosting(https://pocket-jungle.web.app) + Firestore 규칙 배포
+#     → 비밀 키 없이 Workload Identity로 인증 (GitHub이 이 저장소임을 Google에 증명하면 배포 계정 권한을 잠시 빌려 씀)
 # Firebase 웹 설정은 nuxt.config.ts 에 들어 있음. 저장소 Variables 로 덮어쓸 수도 있음
 name: Deploy
 
@@ -56,15 +57,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run generate
+      - name: Google 인증 (키 없는 Workload Identity)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/470235591481/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deployer@pocket-jungle.iam.gserviceaccount.com
       - name: Deploy to Firebase (Hosting + Firestore rules)
-        env:
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: |
-          if [ -z "$SA" ]; then
-            echo "::warning::FIREBASE_SERVICE_ACCOUNT 시크릿이 없어 Firebase 배포를 건너뜁니다 (README 참고)"
-            exit 0
-          fi
-          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
-          npx --yes firebase-tools@latest deploy --only hosting,firestore \
-            --project "$FIREBASE_PROJECT" --non-interactive
+        run: npx --yes firebase-tools@latest deploy --only hosting,firestore --project "$FIREBASE_PROJECT" --non-interactive

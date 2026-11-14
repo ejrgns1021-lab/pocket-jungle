@@ -2,7 +2,7 @@
 
 매일 숲이 바뀌는 레트로 픽셀 서바이벌 로그라이크 웹게임 — **Nuxt 3 + Firebase + Gemini Flash**
 
-▶ **지금 플레이: https://ejrgns1021-lab.github.io/pocket-jungle/**
+▶ **지금 플레이: https://pocket-jungle.web.app** (예비 주소: https://ejrgns1021-lab.github.io/pocket-jungle/)
 
 > 현재 연결된 Firebase 프로젝트: `pocket-jungle` (익명 로그인 · Firestore 서울 리전 · AI Logic(Gemini Developer API) · App Check(reCAPTCHA Enterprise))
 
@@ -63,7 +63,9 @@ Firebase 설정 없이도 바로 플레이됩니다 (기록은 브라우저에, 
 6. **프로젝트 설정 → 내 앱 → 웹 앱(</>) 추가** → 표시되는 `apiKey`, `projectId`, `appId` 확인
 7. Authentication → 설정 → **승인된 도메인**에 `<아이디>.github.io` 추가 (Pages에서도 랭킹이 되게)
 
-> ✅ 이 저장소는 위 ②가 이미 끝났고, 웹 설정값은 `nuxt.config.ts`에 들어 있습니다. 아래 ③은 다른 프로젝트로 바꿀 때만 필요하고, Firebase Hosting 자동 배포를 켜려면 **`FIREBASE_SERVICE_ACCOUNT` 시크릿 하나만** 넣으면 됩니다.
+> ✅ 이 저장소는 위 ②와 Firebase Hosting 자동 배포까지 이미 연결되어 있습니다.
+> 배포 인증은 비밀 키 없이 **Workload Identity**(풀 `github`, 배포 계정 `github-deployer@pocket-jungle.iam.gserviceaccount.com`, 이 저장소에서 온 요청만 허용)로 합니다.
+> 아래 ③은 다른 Firebase 프로젝트로 옮길 때만 참고하세요.
 
 ### ③ GitHub 저장소에 값 넣기
 **Settings → Secrets and variables → Actions**

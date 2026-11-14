@@ -1,0 +1,75 @@
+# main 브랜치에 push 하면 자동으로
+#  1) GitHub Pages 에 배포 (설정 없이 바로 동작 → https://<아이디>.github.io/pocket-jungle/)
+#  2) Firebase Hosting + Firestore 규칙 배포 (저장소 변수 FIREBASE_PROJECT_ID 와 시크릿 FIREBASE_SERVICE_ACCOUNT 를 넣으면 켜짐)
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+env:
+  NUXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+  NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN || (vars.FIREBASE_PROJECT_ID && format('{0}.firebaseapp.com', vars.FIREBASE_PROJECT_ID)) || '' }}
+  NUXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+  NUXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+  NUXT_PUBLIC_GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
+  NUXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ vars.RECAPTCHA_SITE_KEY }}
+
+jobs:
+  pages:
+    name: GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run generate
+        env:
+          NUXT_APP_BASE_URL: /${{ github.event.repository.name }}/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .output/public
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  firebase:
+    name: Firebase Hosting
+    if: ${{ vars.FIREBASE_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run generate
+      - name: Deploy to Firebase (Hosting + Firestore rules)
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT 시크릿이 없어 Firebase 배포를 건너뜁니다 (README 참고)"
+            exit 0
+          fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@latest deploy --only hosting,firestore \
+            --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive

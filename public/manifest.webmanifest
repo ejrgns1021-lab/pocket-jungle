@@ -1,0 +1,10 @@
+{
+  "name": "포켓 정글 서바이벌",
+  "short_name": "포켓정글",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#1c3a24",
+  "theme_color": "#1c3a24",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

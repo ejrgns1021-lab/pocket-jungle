@@ -1,0 +1,17 @@
+{
+  "name": "pocket-jungle",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt generate",
+    "generate": "nuxt generate",
+    "preview": "npx serve .output/public",
+    "deploy": "nuxt generate && firebase deploy --only hosting,firestore"
+  },
+  "dependencies": {
+    "firebase": "^13.3.0",
+    "nuxt": "^3.15.0",
+    "vue": "^3.5.0"
+  }
+}

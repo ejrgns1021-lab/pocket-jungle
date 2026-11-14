@@ -68,11 +68,29 @@ export function useOracle() {
     const day = kstDayKey()
     if (oracle.value?.day === day) return oracle.value
     const cacheKey = 'pj_oracle_' + day
+    const testMode = typeof location !== 'undefined' && new URLSearchParams(location.search).has('oracleTest')
 
-    // 1) 기기 캐시
+    // 테스트: ?oracleTest 로 열면 저장 없이 Gemini를 직접 불러 결과/오류를 콘솔과 화면에 보여 줌
+    if (testMode && $fb?.app) {
+      try {
+        await $fb.ready
+        const r = await askGemini($fb.app, $fb.geminiModel, day)
+        console.info('[oracleTest] 성공', r)
+        oracle.value = r || (fallbackOracle(day) as Oracle)
+      } catch (e: any) {
+        console.error('[oracleTest] 실패', e?.code, e?.message, e)
+        oracle.value = { ...(fallbackOracle(day) as Oracle), line: 'AI 오류: ' + String(e?.message || e).slice(0, 60) }
+      }
+      return oracle.value
+    }
+
+    // 1) 기기 캐시 (AI 결과는 하루 종일, 대체 결과는 30분만 유지하고 다시 시도)
     try {
       const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null')
-      if (isValid(cached)) { oracle.value = cached; return cached }
+      if (isValid(cached) && (cached.source !== 'local' || Date.now() - (cached.at || 0) < 30 * 60 * 1000)) {
+        oracle.value = cached
+        return cached
+      }
     } catch (e) {}
 
     loading.value = true
@@ -81,31 +99,32 @@ export function useOracle() {
       if ($fb?.db) {
         await $fb.ready
         const ref = doc($fb.db, 'oracles', day)
-        // 2) 공유 캐시
+        // 2) 공유 캐시 (AI가 만든 것만 저장되어 있음)
         const snap = await getDoc(ref)
-        if (snap.exists() && isValid(snap.data())) {
+        if (snap.exists() && isValid(snap.data()) && snap.data().source === 'ai') {
           result = { ...(snap.data() as Oracle), source: 'cache' }
         } else {
-          // 3) 오늘의 첫 플레이어 → Gemini 호출
+          // 3) 오늘 아직 아무도 성공 못 했으면 → Gemini 호출, 성공했을 때만 공유 저장
           try { result = await askGemini($fb.app, $fb.geminiModel, day) } catch (e) { console.warn('[oracle] Gemini 실패', e) }
-          if (!result) result = fallbackOracle(day) as Oracle
-          try {
-            await setDoc(ref, { day, name: result.name, mutators: result.mutators, bossTitle: result.bossTitle, line: result.line, source: result.source })
-          } catch (e) {
-            // 다른 사람이 먼저 저장했다면 그것을 사용 (모두 같은 숲을 보게)
-            const again = await getDoc(ref)
-            if (again.exists() && isValid(again.data())) result = { ...(again.data() as Oracle), source: 'cache' }
+          if (result) {
+            try {
+              await setDoc(ref, { day, name: result.name, mutators: result.mutators, bossTitle: result.bossTitle, line: result.line, source: 'ai' })
+            } catch (e) {
+              // 다른 사람이 먼저 저장했다면 그것을 사용 (모두 같은 숲을 보게)
+              const again = await getDoc(ref)
+              if (again.exists() && isValid(again.data()) && again.data().source === 'ai') result = { ...(again.data() as Oracle), source: 'cache' }
+            }
           }
         }
       }
     } catch (e) {
       console.warn('[oracle]', e)
     }
-    // 4) 대체
+    // 4) 대체 (저장하지 않음 → 다음 사람이 다시 AI 시도)
     if (!result) result = fallbackOracle(day) as Oracle
     oracle.value = result
     loading.value = false
-    try { localStorage.setItem(cacheKey, JSON.stringify(result)) } catch (e) {}
+    try { localStorage.setItem(cacheKey, JSON.stringify({ ...result, at: Date.now() })) } catch (e) {}
     return result
   }
 

@@ -2,6 +2,10 @@
 
 매일 숲이 바뀌는 레트로 픽셀 서바이벌 로그라이크 웹게임 — **Nuxt 3 + Firebase + Gemini Flash**
 
+▶ **지금 플레이: https://ejrgns1021-lab.github.io/pocket-jungle/**
+
+> 현재 연결된 Firebase 프로젝트: `pocket-jungle` (익명 로그인 · Firestore 서울 리전 · AI Logic(Gemini Developer API) · App Check(reCAPTCHA Enterprise))
+
 - 서버 없는 정적 사이트 → Firebase 무료(Spark) 요금제로 운영 가능
 - `main`에 push하면 **GitHub Pages**와 **Firebase Hosting**에 자동 배포
 
@@ -45,6 +49,8 @@ Firebase 설정 없이도 바로 플레이됩니다 (기록은 브라우저에, 
 6. **프로젝트 설정 → 내 앱 → 웹 앱(</>) 추가** → 표시되는 `apiKey`, `projectId`, `appId` 확인
 7. Authentication → 설정 → **승인된 도메인**에 `<아이디>.github.io` 추가 (Pages에서도 랭킹이 되게)
 
+> ✅ 이 저장소는 위 ②가 이미 끝났고, 웹 설정값은 `nuxt.config.ts`에 들어 있습니다. 아래 ③은 다른 프로젝트로 바꿀 때만 필요하고, Firebase Hosting 자동 배포를 켜려면 **`FIREBASE_SERVICE_ACCOUNT` 시크릿 하나만** 넣으면 됩니다.
+
 ### ③ GitHub 저장소에 값 넣기
 **Settings → Secrets and variables → Actions**
 
@@ -68,7 +74,10 @@ Firebase 설정 없이도 바로 플레이됩니다 (기록은 브라우저에, 
 3. **그날 첫 플레이어만** Gemini 호출 → Firestore에 저장. 보안 규칙이 "그날 최초 1회 생성"만 허용해서 덮어쓰기 불가
 4. 실패 시 날짜 기반 생성 (호출 0)
 
-요청은 JSON 스키마로 `변이 id 3개 + 짧은 글 3개`만 받고, 생각(thinking)은 최소, 출력은 200토큰 이하로 제한합니다.
+요청은 `변이 id 3개 + 짧은 글 3개` JSON만 받고, 생각(thinking)은 LOW로 제한합니다.
+1순위 `gemini-3.8-flash`가 13초 안에 답하지 않으면 `gemini-3.5-flash-lite`로 한 번 더 시도합니다.
+
+**진단**: 주소 끝에 `?oracleTest=1` (특정 모델은 `&model=gemini-3.5-flash-lite`)을 붙이면 저장 없이 AI를 직접 불러 결과나 오류를 화면과 콘솔에 보여 줍니다.
 실제 게임 수치는 코드에 있어서 AI가 이상한 답을 줘도 게임은 깨지지 않습니다.
 
 ## 폴더 구조

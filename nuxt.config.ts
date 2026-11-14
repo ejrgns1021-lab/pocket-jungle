@@ -30,16 +30,17 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
+      // Firebase 웹 설정은 브라우저에 원래 공개되는 값이라 코드에 넣어도 안전함 (보안은 Firestore 규칙 + App Check가 담당)
       firebase: {
-        apiKey: '',
-        authDomain: '',
-        projectId: '',
-        appId: ''
+        apiKey: 'AIzaSyCObHEfwVv75ov2nJV1Ycw3FSC3N-Slb8c',
+        authDomain: 'pocket-jungle.firebaseapp.com',
+        projectId: 'pocket-jungle',
+        appId: '1:470235591481:web:a886c8a6abfe4cff1f6ee8'
       },
       // Firebase AI Logic으로 부를 Gemini 모델 (콘솔에서 지원 모델 확인 후 바꿀 수 있음)
       geminiModel: 'gemini-3.8-flash',
       // App Check(reCAPTCHA Enterprise) 사이트 키 — AI Logic 보호에 필요
-      recaptchaSiteKey: ''
+      recaptchaSiteKey: '6Le3LB8uAAAAAKXP9EQd46eMRkDoY2X09nLpNQeI'
     }
   }
 })

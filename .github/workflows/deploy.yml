@@ -1,6 +1,7 @@
 # main 브랜치에 push 하면 자동으로
 #  1) GitHub Pages 에 배포 (설정 없이 바로 동작 → https://<아이디>.github.io/pocket-jungle/)
-#  2) Firebase Hosting + Firestore 규칙 배포 (저장소 변수 FIREBASE_PROJECT_ID 와 시크릿 FIREBASE_SERVICE_ACCOUNT 를 넣으면 켜짐)
+#  2) Firebase Hosting + Firestore 규칙 배포 (시크릿 FIREBASE_SERVICE_ACCOUNT 를 넣으면 켜짐)
+# Firebase 웹 설정은 nuxt.config.ts 에 들어 있음. 저장소 Variables 로 덮어쓸 수도 있음
 name: Deploy
 
 on:
@@ -18,12 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NUXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
-  NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN || (vars.FIREBASE_PROJECT_ID && format('{0}.firebaseapp.com', vars.FIREBASE_PROJECT_ID)) || '' }}
-  NUXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-  NUXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
-  NUXT_PUBLIC_GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
-  NUXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ vars.RECAPTCHA_SITE_KEY }}
+  FIREBASE_PROJECT: ${{ vars.FIREBASE_PROJECT_ID || 'pocket-jungle' }}
 
 jobs:
   pages:
@@ -51,7 +47,6 @@ jobs:
 
   firebase:
     name: Firebase Hosting
-    if: ${{ vars.FIREBASE_PROJECT_ID != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,4 +67,4 @@ jobs:
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           npx --yes firebase-tools@latest deploy --only hosting,firestore \
-            --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive
+            --project "$FIREBASE_PROJECT" --non-interactive

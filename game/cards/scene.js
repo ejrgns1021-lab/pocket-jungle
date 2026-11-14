@@ -66,10 +66,13 @@ export function createScene(canvas, getRun, opts = {}) {
       const w = img.width * sc
       const h = img.height * sc
       const stagger = n >= 3 && i % 2 === 1 ? -16 : 0
-      return { e, x: W * xs[Math.min(i, xs.length - 1)], y: base + stagger, w, h, sc }
+      return { e, x: AX() + AW() * xs[Math.min(i, xs.length - 1)], y: base + stagger, w, h, sc }
     })
   }
-  function playerPos() { return { x: W * (isMobile ? 0.15 : 0.2), y: stage.bottom - 30 } }
+  // 넓은 화면에서도 전투가 가운데 모이도록 최대 960px 무대
+  const AW = () => Math.min(W, 960)
+  const AX = () => (W - AW()) / 2
+  function playerPos() { return { x: AX() + AW() * (isMobile ? 0.15 : 0.2), y: stage.bottom - 30 } }
   function spiritPos() { const p = playerPos(); return { x: p.x + 34, y: p.y - 52 + Math.sin(performance.now() / 300) * 4 } }
   function slotOf(uid) {
     const run = getRun()
@@ -182,7 +185,7 @@ export function createScene(canvas, getRun, opts = {}) {
         break
       }
       case 'execute': { const c = centerOf(ev.to); if (c) { burst(c.x, c.y, '#c068e8', 20, 220); num(c.x, c.y - 60, '처형!', '#e8a0ff', 22) } break }
-      case 'chain': { const s = playerPos(); const c = centerOf(ev.to); if (c) later(0.18, () => bolts.push({ x1: s.x + W * 0.35, y1: c.y - 20, x2: c.x, y2: c.y, color: '#f8e858', life: 0.25, max: 0.25 })); break }
+      case 'chain': { const s = playerPos(); const c = centerOf(ev.to); if (c) later(0.18, () => bolts.push({ x1: s.x + AW() * 0.35, y1: c.y - 20, x2: c.x, y2: c.y, color: '#f8e858', life: 0.25, max: 0.25 })); break }
       case 'zap': { const c = centerOf(ev.to); if (c) bolts.push({ x1: c.x, y1: stage.top, x2: c.x, y2: c.y, color: '#58c8ff', life: 0.3, max: 0.3 }); pendingDelay.set(ev.to, 0.05); break }
       case 'spirit': {
         const s = spiritPos(); const c = centerOf(ev.to)

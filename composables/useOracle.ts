@@ -30,6 +30,7 @@ async function askGemini(app: any, modelName: string, day: string): Promise<Orac
   const { getAI, getGenerativeModel, GoogleAIBackend, ThinkingLevel } = await import('firebase/ai')
   const ai = getAI(app, { backend: new GoogleAIBackend() })
   // 생각(thinking)은 최소로: 2.x는 예산 0, 3.x는 LOW. 모델이 거부하면 설정 없이 한 번 더 시도
+  const lite = modelName.includes('lite')
   const thinking = modelName.startsWith('gemini-2')
     ? { thinkingBudget: 0 }
     : { thinkingLevel: ThinkingLevel.LOW }
@@ -39,10 +40,10 @@ async function askGemini(app: any, modelName: string, day: string): Promise<Orac
       responseMimeType: 'application/json',
       maxOutputTokens: 1024, // 생각 토큰 포함 상한 (하루 1번이라 비용 미미)
       temperature: 1.1,
-      ...(withThinking ? { thinkingConfig: thinking } : {})
+      ...(withThinking && !lite ? { thinkingConfig: thinking } : {})
     } as any,
     systemInstruction: '너는 레트로 픽셀 정글 서바이벌 게임의 일일 신탁이다. JSON 한 줄만 출력한다.'
-  }, { timeout: 15000 })
+  }, { timeout: 12000 })
   const catalog = MUTATOR_IDS.map((id) => `${id}:${(MUTATORS as any)[id].name}`).join(',')
   const prompt = `날짜 ${day}. 변이목록 ${catalog}\n서로 어울리는 변이 3개를 골라 이 형식으로만 답해: {"n":"숲 이름(한국어 12자 이내)","m":["id","id","id"],"b":"보스 칭호 형용사(6자 이내)","l":"신비로운 예언 한 줄(30자 이내)"}`
   let res
@@ -61,6 +62,18 @@ async function askGemini(app: any, modelName: string, day: string): Promise<Orac
   return { day, name: clean(j.n, 16) || '이름 없는 숲', mutators: ids, bossTitle: clean(j.b, 8), line: clean(j.l, 40), source: 'ai' }
 }
 
+// 1순위 Flash가 느리거나 혼잡하면 Flash-Lite로 한 번 더 (둘 다 실패 시 날짜 기반)
+const BACKUP_MODEL = 'gemini-3.5-flash-lite'
+async function askWithBackup(app: any, primary: string, day: string): Promise<Oracle | null> {
+  try {
+    return await withTimeout(askGemini(app, primary, day), 13000)
+  } catch (e) {
+    console.warn('[oracle] ' + primary + ' 실패 → ' + BACKUP_MODEL + ' 시도', e)
+    if (primary === BACKUP_MODEL) throw e
+    return await withTimeout(askGemini(app, BACKUP_MODEL, day), 13000)
+  }
+}
+
 const withTimeout = <T>(p: Promise<T>, ms: number) =>
   Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('timeout ' + ms + 'ms')), ms))])
 
@@ -77,7 +90,8 @@ export function useOracle() {
     if (testMode && $fb?.app) {
       try {
         await $fb.ready
-        const r = await withTimeout(askGemini($fb.app, $fb.geminiModel, day), 20000)
+        const forced = new URLSearchParams(location.search).get('model')
+        const r = forced ? await withTimeout(askGemini($fb.app, forced, day), 20000) : await askWithBackup($fb.app, $fb.geminiModel, day)
         console.info('[oracleTest] 성공', r)
         oracle.value = r || (fallbackOracle(day) as Oracle)
       } catch (e: any) {
@@ -108,7 +122,7 @@ export function useOracle() {
           result = { ...(snap.data() as Oracle), source: 'cache' }
         } else {
           // 3) 오늘 아직 아무도 성공 못 했으면 → Gemini 호출, 성공했을 때만 공유 저장
-          try { result = await withTimeout(askGemini($fb.app, $fb.geminiModel, day), 20000) } catch (e) { console.warn('[oracle] Gemini 실패', e) }
+          try { result = await askWithBackup($fb.app, $fb.geminiModel, day) } catch (e) { console.warn('[oracle] Gemini 실패', e) }
           if (result) {
             try {
               await setDoc(ref, { day, name: result.name, mutators: result.mutators, bossTitle: result.bossTitle, line: result.line, source: 'ai' })

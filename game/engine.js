@@ -21,11 +21,14 @@ export function createGame(canvas, ui) {
   let width = 0
   let height = 0
   let dpr = 1
+  let viewScale = 1 // PC 큰 화면: 세상을 확대해 보여줌(보이는 범위를 적당히 제한)
 
   function handleResize() {
-    width = window.innerWidth
-    height = window.innerHeight
-    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const touch = matchMedia('(pointer: coarse)').matches
+    viewScale = touch || window.innerWidth < 760 ? 1 : Math.max(1, Math.min(window.innerHeight / 720, window.innerWidth / 1280, 2.4))
+    width = window.innerWidth / viewScale
+    height = window.innerHeight / viewScale
+    dpr = Math.min(window.devicePixelRatio || 1, 2) * viewScale
     canvas.width = Math.floor(width * dpr)
     canvas.height = Math.floor(height * dpr)
     ctx.imageSmoothingEnabled = false
@@ -1305,7 +1308,7 @@ export function createGame(canvas, ui) {
       const dx = player.x - e.x
       const dy = player.y - e.y
       const dist = Math.hypot(dx, dy)
-      if (!e.isBoss && dist > 1650) { enemies.splice(i, 1); continue }
+      if (!e.isBoss && dist > Math.max(1650, Math.max(width, height) * 0.58 + 400)) { enemies.splice(i, 1); continue }
       const inv = dist > 0.001 ? 1 / dist : 0
       if (dx < -2) e.facingLeft = true
       else if (dx > 2) e.facingLeft = false
@@ -2050,20 +2053,22 @@ export function createGame(canvas, ui) {
   function onPointerDown(e) {
     if (gameState !== 'PLAYING' || stick.active) return
     SoundFX.unlock()
-    Object.assign(stick, { active: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 })
+    Object.assign(stick, { active: true, id: e.pointerId, ox: e.clientX / viewScale, oy: e.clientY / viewScale, dx: 0, dy: 0 })
   }
   function onPointerMove(e) {
     if (!stick.active || e.pointerId !== stick.id) return
-    let rx = e.clientX - stick.ox
-    let ry = e.clientY - stick.oy
+    const px = e.clientX / viewScale
+    const py = e.clientY / viewScale
+    let rx = px - stick.ox
+    let ry = py - stick.oy
     const dist = Math.hypot(rx, ry)
     // 손가락이 원 밖으로 멀리 나가면 조이스틱 중심이 따라온다 (모바일에서 훨씬 편함)
     if (dist > stick.maxR * 1.4) {
       const k = (dist - stick.maxR) / dist
       stick.ox += rx * k
       stick.oy += ry * k
-      rx = e.clientX - stick.ox
-      ry = e.clientY - stick.oy
+      rx = px - stick.ox
+      ry = py - stick.oy
     }
     const d2 = Math.hypot(rx, ry)
     if (d2 > 0.001) {

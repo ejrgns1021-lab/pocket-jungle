@@ -37,22 +37,30 @@ async function askGemini(app: any, modelName: string, day: string): Promise<Orac
       l: Schema.string({ description: '신비로운 예언 한 줄, 한국어 30자 이내' })
     }
   })
-  const thinkingConfig = modelName.startsWith('gemini-2')
+  // 생각(thinking)은 최소로: 2.x는 예산 0, 3.x는 LOW. 모델이 거부하면 설정 없이 한 번 더 시도
+  const thinking = modelName.startsWith('gemini-2')
     ? { thinkingBudget: 0 }
-    : { thinkingLevel: ThinkingLevel.MINIMAL }
-  const model = getGenerativeModel(ai, {
+    : { thinkingLevel: ThinkingLevel.LOW }
+  const makeModel = (withThinking: boolean) => getGenerativeModel(ai, {
     model: modelName,
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: schema,
-      maxOutputTokens: 200,
+      maxOutputTokens: 1024, // 생각 토큰 포함 상한 (하루 1번이라 비용 미미)
       temperature: 1.1,
-      thinkingConfig
+      ...(withThinking ? { thinkingConfig: thinking } : {})
     } as any,
     systemInstruction: '너는 레트로 픽셀 정글 서바이벌 게임의 일일 신탁이다.'
   })
   const catalog = MUTATOR_IDS.map((id) => `${id}:${(MUTATORS as any)[id].name}`).join(',')
-  const res = await model.generateContent(`날짜 ${day}. 변이목록 ${catalog}. 서로 어울리는 변이 3개(m)와 숲 이름(n), 보스 칭호(b), 예언(l)을 정해.`)
+  const prompt = `날짜 ${day}. 변이목록 ${catalog}. 서로 어울리는 변이 3개(m)와 숲 이름(n), 보스 칭호(b), 예언(l)을 정해.`
+  let res
+  try {
+    res = await makeModel(true).generateContent(prompt)
+  } catch (e: any) {
+    if (!/thinking/i.test(String(e?.message))) throw e
+    res = await makeModel(false).generateContent(prompt)
+  }
   const j = JSON.parse(res.response.text())
   const ids = Array.from(new Set((j.m || []).filter((id: string) => MUTATOR_IDS.includes(id)))).slice(0, 3) as string[]
   if (ids.length < 2) return null

@@ -23,6 +23,8 @@
       </div>
     </div>
 
+    <CardGame v-if="screen === 'card'" :oracle="oracle" :night="night" @menu="openMenu" />
+
     <StartScreen
       v-if="screen === 'menu'" :key="menuKey"
       :oracle="oracle" :night="night" :initial-tab="menuTab" @start="startRun"
@@ -31,7 +33,7 @@
     <GameOver
       v-if="screen === 'over' && over"
       :stats="over.stats" :result="over.result" :forest-name="oracle?.name || ''" :submitted="over.submitted"
-      @restart="startRun" @menu="openMenu"
+      @restart="startRun('survival')" @menu="openMenu"
     />
   </div>
 </template>
@@ -44,7 +46,7 @@ const MUT = MUTATORS as Record<string, { icon: string; name: string; desc: strin
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 let game: any = null
 
-const screen = ref<'menu' | 'playing' | 'over'>('menu')
+const screen = ref<'menu' | 'playing' | 'over' | 'card'>('menu')
 const menuTab = ref('play')
 const menuKey = ref(0)
 const hud = ref<any>({ hp: 1, maxHp: 1, xp: 0, xpNeed: 20, level: 1, time: 0, kills: 0, nextBoss: 60, mult: 1 })
@@ -60,7 +62,7 @@ const fx = ref(2)
 
 const { oracle, fetchToday } = useOracle()
 const metaApi = useMeta()
-const lb = useLeaderboard()
+const lb = useLeaderboard('scores')
 
 let bannerTimer: any = null
 
@@ -95,8 +97,14 @@ onMounted(async () => {
 
 onBeforeUnmount(() => game?.destroy())
 
-function startRun() {
+function startRun(mode?: string) {
   if (!oracle.value) return
+  if (mode === 'card') {
+    game.sleep(true)
+    screen.value = 'card'
+    return
+  }
+  game.sleep(false)
   screen.value = 'playing'
   over.value = null
   choice.value = null
@@ -128,6 +136,7 @@ async function onGameOver(stats: any) {
 }
 
 function openMenu(tab: string) {
+  game?.sleep(false)
   menuTab.value = tab
   menuKey.value++
   screen.value = 'menu'

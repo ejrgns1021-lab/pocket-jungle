@@ -89,7 +89,7 @@ export function useOracle() {
     // 테스트: ?oracleTest 로 열면 저장 없이 Gemini를 직접 불러 결과/오류를 콘솔과 화면에 보여 줌
     if (testMode && $fb?.app) {
       try {
-        await $fb.ready
+        await withTimeout($fb.ready, 6000)
         const forced = new URLSearchParams(location.search).get('model')
         const r = forced ? await withTimeout(askGemini($fb.app, forced, day), 20000) : await askWithBackup($fb.app, $fb.geminiModel, day)
         console.info('[oracleTest] 성공', r)
@@ -114,7 +114,7 @@ export function useOracle() {
     let result: Oracle | null = null
     try {
       if ($fb?.db) {
-        await $fb.ready
+        await withTimeout($fb.ready, 6000)
         const ref = doc($fb.db, 'oracles', day)
         // 2) 공유 캐시 (AI가 만든 것만 저장되어 있음)
         const snap = await getDoc(ref)

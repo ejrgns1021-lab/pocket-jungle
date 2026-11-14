@@ -76,5 +76,21 @@ export function useMeta() {
     return { score, essence, newBest, evolved: stage > prevStage, stage }
   }
 
-  return { meta: state, load, buy, levelOf, recordRun, spiritStage: computed(() => spiritStage(state.totalKills)) }
+  /** 카드 원정 결과 반영 (점수·정수는 엔진이 계산) */
+  function recordCardRun(r: any, mutators: string[]) {
+    const prevStage = spiritStage(state.totalKills)
+    state.essence += r.essence
+    state.totalKills += r.kills
+    state.runs += 1
+    const s = state as any
+    const newBest = r.score > (s.bestCardScore || 0)
+    if (newBest) s.bestCardScore = r.score
+    for (const m of mutators) if (!state.seenMutators.includes(m)) state.seenMutators.push(m)
+    const stage = spiritStage(state.totalKills)
+    saveLocal()
+    saveRemote()
+    return { newBest, evolved: stage > prevStage, stage }
+  }
+
+  return { meta: state, load, buy, levelOf, recordRun, recordCardRun, spiritStage: computed(() => spiritStage(state.totalKills)) }
 }

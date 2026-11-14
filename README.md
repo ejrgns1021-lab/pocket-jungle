@@ -9,7 +9,21 @@
 - 서버 없는 정적 사이트 → Firebase 무료(Spark) 요금제로 운영 가능
 - `main`에 push하면 **GitHub Pages**와 **Firebase Hosting**에 자동 배포
 
-## 게임 특징
+## 게임 모드
+
+### 🃏 카드 원정 (기본)
+덱빌딩 턴제 배틀. 매일 바뀌는 숲 지도(⚔️전투 · 💀정예 · 🔥모닥불 · 🛒상점 · ❓이벤트 · 🎁보물 · 👑보스)를 골라 나아갑니다.
+- **6속성 카드 36종** — 풀(방어·독) 불꽃(화상·폭딜) 물(빙결·드로우) 전기(감전·연쇄) 신비(드로우·약화) 용(힘·강공)
+- **속성 체인** — 같은 속성을 연달아 쓰면 피해·방어 +2씩 누적
+- **조합 카드** — 두 속성 카드가 손에 모이면 합쳐서 조합 카드(10종) 생성
+- **유물 8종 · 이벤트 · 상점 · 카드 강화/제거**, 보스를 잡으면 더 깊은 ACT로 무한 진행
+- 카드를 탭하면 사용, 적을 탭하면 대상 지정
+- 오늘의 숲 변이(AI)가 카드 규칙에도 적용 (예: 짙은 안개 = 적 의도 숨김, 메아리 = 첫 카드 2번 발동)
+
+### ⚔️ 서바이벌
+기존 실시간 액션 모드. 시작 화면에서 전환할 수 있습니다.
+
+## 공통 특징
 
 | 구분 | 내용 |
 |---|---|
@@ -83,7 +97,13 @@ Firebase 설정 없이도 바로 플레이됩니다 (기록은 브라우저에, 
 ## 폴더 구조
 
 ```
-app.vue                   화면 전체 (캔버스 + 메뉴/HUD/선택창/일시정지)
+app.vue                   화면 전체 (모드 전환 · 서바이벌 화면)
+components/CardGame.vue   카드 원정 화면 (전투 UI · 지도 · 보상 · 상점 · 이벤트)
+components/card/          CardView(카드 한 장) · MapView(지도)
+game/cards/
+  data.js                 카드·조합·적·보스·유물·변이·이벤트 데이터
+  engine.js               카드 규칙 엔진 (화면과 분리)
+  scene.js                전투 무대 캔버스 연출
 components/               GameHud · ChoiceSheet · StartScreen · GameOver
 composables/              useOracle(Gemini) · useMeta(영구 성장) · useLeaderboard(랭킹)
 plugins/firebase.client.ts  Firebase · App Check · 익명 로그인

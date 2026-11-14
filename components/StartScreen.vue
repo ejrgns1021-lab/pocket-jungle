@@ -7,6 +7,11 @@
         <p class="mono sub">매일 숲이 변한다 · DAY {{ oracle?.day || '...' }}</p>
       </div>
 
+      <div class="modes">
+        <button class="mode" :class="{ on: mode === 'card' }" @click="setMode('card')"><b>🃏 카드 원정</b><small>덱빌딩 턴제 배틀</small></button>
+        <button class="mode" :class="{ on: mode === 'survival' }" @click="setMode('survival')"><b>⚔️ 서바이벌</b><small>실시간 액션</small></button>
+      </div>
+
       <div class="tabs">
         <button v-for="t in tabs" :key="t.id" class="tab" :class="{ on: tab === t.id }" @click="tab = t.id">{{ t.label }}</button>
       </div>
@@ -35,7 +40,7 @@
         <div class="chips">
           <span class="chip" :class="night ? 'night' : 'day'">{{ night ? '🌙 밤의 정글 (적 체력↑ 경험치 +25%)' : '☀️ 낮의 정글' }}</span>
           <span class="chip spirit">🌱 {{ stageName }} 동행</span>
-          <span v-if="meta.bestScore" class="chip">🏆 최고 {{ meta.bestScore.toLocaleString() }}</span>
+          <span v-if="best" class="chip">🏆 최고 {{ best.toLocaleString() }}</span>
         </div>
 
         <label class="nick">
@@ -43,7 +48,8 @@
           <input v-model="nick" maxlength="12" placeholder="트레이너" @change="saveNick">
         </label>
 
-        <p class="howto">👆 화면 아무 곳이나 끌어서 이동 · 스킬은 자동 발사 · ⌨️ WASD / 1·2·3 / R / P</p>
+        <p v-if="mode === 'card'" class="howto">🃏 카드를 탭하면 사용 · 적을 탭하면 대상 지정 · 같은 속성을 연달아 쓰면 <b>체인</b> 보너스 · 두 속성이 손에 모이면 <b>조합 카드</b>로 합체!</p>
+        <p v-else class="howto">👆 화면 아무 곳이나 끌어서 이동 · 스킬은 자동 발사 · ⌨️ WASD / 1·2·3 / R / P</p>
       </div>
 
       <!-- 성장 탭 -->
@@ -56,7 +62,7 @@
         <div class="upgrades">
           <div v-for="u in UPG" :key="u.id" class="upg">
             <span class="ui">{{ u.icon }}</span>
-            <span class="ub"><b>{{ u.name }}</b> <em>Lv.{{ levelOf(u.id) }}/{{ u.max }}</em><small>{{ u.desc }}</small></span>
+            <span class="ub"><b>{{ u.name }}</b> <em>Lv.{{ levelOf(u.id) }}/{{ u.max }}</em><small>🃏 {{ CARD_DESC[u.id] }} · ⚔️ {{ u.desc }}</small></span>
             <button class="btn buy" :disabled="levelOf(u.id) >= u.max || meta.essence < cost(u)" @click="buy(u.id)">
               {{ levelOf(u.id) >= u.max ? 'MAX' : '💠' + cost(u) }}
             </button>
@@ -66,22 +72,23 @@
 
       <!-- 랭킹 탭 -->
       <div v-else class="content scroll-y">
-        <p v-if="!lb.enabled.value" class="howto">Firebase를 연결하면 같은 '오늘의 숲'을 플레이한 사람들과 순위를 겨룰 수 있어요.</p>
+        <p v-if="!lb.enabled" class="howto">Firebase를 연결하면 같은 '오늘의 숲'을 플레이한 사람들과 순위를 겨룰 수 있어요.</p>
         <template v-else>
-          <p class="howto">오늘({{ oracle?.day }}) 같은 숲에서 겨룬 순위 · 매일 자정 초기화</p>
+          <p class="howto">{{ mode === 'card' ? '🃏 카드 원정' : '⚔️ 서바이벌' }} · 오늘({{ oracle?.day }}) 같은 숲에서 겨룬 순위 · 매일 자정 초기화</p>
           <ol class="rank">
-            <li v-for="(r, i) in lb.rows.value" :key="r.uid" :class="{ me: r.uid === lb.myUid.value }">
+            <li v-for="(r, i) in lb.rows" :key="r.uid" :class="{ me: r.uid === lb.myUid }">
               <span class="rk">{{ i + 1 }}</span>
               <span class="rn">{{ r.name }}</span>
               <span class="rs mono">{{ r.score.toLocaleString() }}</span>
-              <small>{{ Math.floor(r.time / 60) }}분 · LV{{ r.level }}</small>
+              <small v-if="mode === 'card'">{{ r.level }}칸 진행 · {{ r.kills }}마리 처치</small>
+              <small v-else>{{ Math.floor(r.time / 60) }}분 · LV{{ r.level }}</small>
             </li>
-            <li v-if="!lb.rows.value.length" class="empty">아직 기록이 없어요. 첫 번째가 되어 보세요!</li>
+            <li v-if="!lb.rows.length" class="empty">아직 기록이 없어요. 첫 번째가 되어 보세요!</li>
           </ol>
         </template>
       </div>
 
-      <button class="btn-start go" :disabled="!oracle" @click="$emit('start')">▶ 모험 시작하기</button>
+      <button class="btn-start go" :disabled="!oracle" @click="$emit('start', mode)">{{ mode === 'card' ? '▶ 카드 원정 떠나기' : '▶ 서바이벌 시작' }}</button>
     </div>
   </div>
 </template>
@@ -89,6 +96,7 @@
 <script setup lang="ts">
 import { MUTATORS } from '~/game/mutators.js'
 import { META_UPGRADES, upgradeCost, SPIRIT_STAGES } from '~/game/meta.js'
+import { CARD_META_DESC } from '~/game/cards/data.js'
 
 const props = defineProps<{ oracle: any; night: boolean; initialTab?: string }>()
 defineEmits(['start'])
@@ -99,16 +107,31 @@ const tabs = [{ id: 'play', label: '⚔️ 모험' }, { id: 'grow', label: '💠
 const tab = ref(props.initialTab || 'play')
 
 const { meta, buy, levelOf, spiritStage } = useMeta()
-const lb = useLeaderboard()
+const CARD_DESC = CARD_META_DESC as Record<string, string>
+const mode = ref<'card' | 'survival'>('card')
+const lbCard = useLeaderboard('cards')
+const lbSurv = useLeaderboard('scores')
+const lb = reactive({ enabled: lbCard.enabled, rows: computed(() => (mode.value === 'card' ? lbCard.rows.value : lbSurv.rows.value)), myUid: computed(() => lbCard.myUid.value || lbSurv.myUid.value), value: null })
+const best = computed(() => (mode.value === 'card' ? (meta as any).bestCardScore : meta.bestScore) || 0)
+function setMode(m: 'card' | 'survival') {
+  mode.value = m
+  localStorage.setItem('pj_mode', m)
+  if (tab.value === 'rank') loadRank()
+}
+function loadRank() { (mode.value === 'card' ? lbCard : lbSurv).loadTop() }
 const cost = (u: any) => upgradeCost(u, levelOf(u.id))
 const stageName = computed(() => SPIRIT_STAGES[spiritStage.value].name)
 const nextStage = computed(() => SPIRIT_STAGES[spiritStage.value + 1])
 const srcLabel = computed(() => ({ ai: '✨ AI 신탁', cache: '✨ AI 신탁', local: '🎲 숲의 기억' } as any)[props.oracle?.source] || '')
 
 const nick = ref('')
-onMounted(() => { nick.value = localStorage.getItem('pj_nick') || '' })
+onMounted(() => {
+  nick.value = localStorage.getItem('pj_nick') || ''
+  mode.value = (localStorage.getItem('pj_mode') as any) === 'survival' ? 'survival' : 'card'
+  if (tab.value === 'rank') loadRank()
+})
 const saveNick = () => localStorage.setItem('pj_nick', nick.value.trim())
-watch(tab, (t) => { if (t === 'rank') lb.loadTop() })
+watch(tab, (t) => { if (t === 'rank') loadRank() })
 </script>
 
 <style scoped>
@@ -117,6 +140,11 @@ watch(tab, (t) => { if (t === 'rank') lb.loadTop() })
 .badge { display: inline-block; padding: 3px 10px; background: #202830; color: #f8d838; font-size: 10px; font-weight: 900; letter-spacing: 0.08em; border-radius: 4px; }
 h1 { font-size: 26px; font-weight: 900; color: #206830; margin-top: 6px; }
 .sub { font-size: 12px; color: #c83828; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mode { border: 3px solid #202830; border-radius: 8px; background: #e8ece0; padding: 6px; display: flex; flex-direction: column; align-items: center; color: #485850; }
+.mode b { font-size: 15px; }
+.mode small { font-size: 11px; }
+.mode.on { background: linear-gradient(180deg, #fff4c8, #f8d878); color: #202830; box-shadow: inset 0 0 0 2px #e0a820, 0 3px 0 #202830; }
 .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .tab { min-height: 40px; border: 2px solid #202830; border-radius: 6px; background: #e8ece0; font-weight: 900; font-size: 14px; color: #485850; }
 .tab.on { background: #202830; color: #f8d838; }

@@ -2103,6 +2103,7 @@ export function createGame(canvas, ui) {
   // ---------------------------------------------------------------------------
   let lastTime = performance.now()
   let rafId = 0
+  let sleeping = false // 카드 모드일 때 서바이벌 화면은 그리지 않음
   function loop(now) {
     const realDt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000))
     lastTime = now
@@ -2114,6 +2115,7 @@ export function createGame(canvas, ui) {
       if (slowmo.t <= 0) slowmo.f = 1
     }
     // 테스트용 배속 (?speed=3) — 한 프레임을 여러 번 나눠 계산해서 충돌 판정이 깨지지 않게 함
+    if (sleeping) { rafId = requestAnimationFrame(loop); return }
     for (let s = 0; s < simSpeed; s++) update(dt)
     render(realDt)
     autoQuality(realDt)
@@ -2266,6 +2268,7 @@ export function createGame(canvas, ui) {
     },
 
     setMuted(m) { SoundFX.unlock(); SoundFX.muted = m },
+    sleep(v) { sleeping = !!v; lastTime = performance.now() },
 
     /** 이펙트 품질: 2=화려, 1=가볍게. 사용자가 직접 고르면 자동 조절은 끔 */
     setFx(level) {
